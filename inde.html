@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Smart Pillbox Dashboard</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+    }
+
+    header {
+      background-color: #81c784;
+      padding: 20px;
+      color: white;
+    }
+
+    #graph-container {
+      margin: 30px auto;
+    }
+
+    .sidebar {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 240px;
+      height: 100%;
+      background-color: #388e3c;
+      color: white;
+      padding: 20px;
+      box-sizing: border-box;
+      text-align: left;
+    }
+
+    .content {
+      margin-left: 260px;
+      padding: 20px;
+    }
+
+    iframe {
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <h2>💊 Smart Pillbox</h2>
+    <p>An IoT-powered system to monitor daily pill intake and emergency alerts in real-time.</p>
+    <hr />
+    <strong>Tech Stack:</strong>
+    <ul>
+      <li>ESP8266 + Ultrasonic</li>
+      <li>ThingSpeak API</li>
+      <li>GitHub Pages</li>
+      <li>HTML · CSS · JS</li>
+    </ul>
+  </div>
+
+  <div class="content">
+    <header>
+      <h1>📦 Live Monitoring Dashboard</h1>
+      <p>Displaying pill intake for <span id="dayName"></span></p>
+    </header>
+
+    <div id="graph-container"></div>
+  </div>
+
+  <script>
+    const day = new Date().getDay(); // 0 = Sunday
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    document.getElementById("dayName").textContent = dayNames[day];
+
+    const fieldMap = { 0: 7, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6 };
+    const field = fieldMap[day];
+    const channelID = "2912929"; // Replace with your real ThingSpeak Channel ID
+
+    const iframe = document.createElement("iframe");
+    iframe.width = "450";
+    iframe.height = "260";
+    iframe.src = `https://thingspeak.com/channels/${channelID}/field${field}.html?days=1&type=bar`;
+    document.getElementById("graph-container").appendChild(iframe);
+  </script>
+</body>
+</html>
