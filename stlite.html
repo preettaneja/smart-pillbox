@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+    />
+    <title>Stlite app</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@stlite/browser@0.80.5/build/style.css"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+import { mount } from "https://cdn.jsdelivr.net/npm/@stlite/browser@0.80.5/build/stlite.js"
+mount(
+  {
+    requirements: ["requests"],
+    entrypoint: "streamlit_app.py",
+    files: {
+"streamlit_app.py": `import streamlit as st
+import datetime
+import requests
+import pandas as pd
+
+st.set_page_config(page_title="Smart Pillbox Monitoring", page_icon="💊")
+
+# --- USER CREDENTIALS ---
+USERNAME = "user"
+PASSWORD = "pillbox123"
+
+# --- THINKSPEED CONFIG ---
+CHANNEL_ID = "2912929"
+READ_API_KEY = "1NNFKY2F2EUYM6VR"
+
+field_map = {
+    "Monday": "field1",
+    "Tuesday": "field2",
+    "Wednesday": "field3",
+    "Thursday": "field4",
+    "Friday": "field5",
+    "Saturday": "field6",
+    "Sunday": "field7",
+}
+sos_field = "field8"
+
+# --- LOGIN STATE ---
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+
+# --- LOGIN PAGE ---
+if not st.session_state.authenticated:
+    st.markdown(
+        "<h2 style='text-align: center; color: #00796b; font-family: \\"Montserrat\\", sans-serif; font-weight: bold;'>🔐 iPill Box Login</h2>", 
+        unsafe_allow_html=True
+    )
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+
+    if st.button("Login"):
+        if username == USERNAME and password == PASSWORD:
+            st.session_state.authenticated = True
+            st.rerun()
+        else:
+            st.error("❌ Incorrect username or password.")
+
+# --- DASHBOARD ---
+if st.session_state.authenticated:
+    st.title("💊 Smart Pillbox Monitoring Dashboard")
+
+    # --- SIDEBAR WITH UPDATED DESIGN ---
+    with st.sidebar:
+        st.markdown(
+            """
+            <style>
+                @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@500&display=swap');
+                .sidebar .sidebar-content {
+                    font-family: 'Montserrat', sans-serif !important;
+                }
+                ul {
+                    list-style-type: none;
+                    padding-left: 0;
+                }
+                li::before {
+                    content: "🔹";
+                    padding-right: 10px;
+                }
+            </style>
+            """, unsafe_allow_html=True
+        )
+
+        # "Dashboard" Title with increased size and top alignment
+        st.markdown("<h2 style='font-family: \\"Montserrat\\", sans-serif; font-weight: bold;'>Dashboard</h2>", unsafe_allow_html=True)
+        st.markdown("""
+        <p>An intelligent system that monitors daily pill intake using an ultrasonic sensor and updates live data to the cloud.</p>
+        <p>Powered by ESP8266, ThingSpeak, GitHub, and a custom web dashboard — it logs real-time pill activity and emergency alerts with just Wi-Fi.</p>
+        <h5>Tech Stack:</h5>
+        <ul>
+            <li>ESP8266 · Ultrasonic Sensor</li>
+            <li>ThingSpeak API</li>
+            <li>GitHub Pages</li>
+            <li>Python · Streamlit · Matplotlib</li>
+        </ul>
+        <p><strong>Stay on track. Stay healthy.</strong></p>
+        """, unsafe_allow_html=True)
+
+        # Logout Button
+        logout_button = st.button("🔓 Logout", use_container_width=True)
+        if logout_button:
+            st.session_state.authenticated = False
+            st.rerun()
+
+        # Refresh Button
+        refresh_button = st.button("🔄 Refresh Now", use_container_width=True)
+        if refresh_button:
+            st.rerun()
+
+        # Adding the separator line and trademark text
+        st.markdown("<hr>", unsafe_allow_html=True)
+        st.markdown(
+            "<p style='font-family: \\"Montserrat\\", sans-serif; color: #555;'>A project by Shaurya Mehta, Pranalee Patel, Preet Taneja, Muskan Singh, Kanishka Saini, Shubham Choudhary</p>",
+            unsafe_allow_html=True
+        )
+
+        st.markdown("---")
+
+    # --- REFRESH BUTTON ---
+    if st.button("🔄 Refresh Now"):
+        st.rerun()
+
+ 
+    # --- GET TODAY'S FIELD DATA ---
+    today = datetime.datetime.today().strftime("%A")
+    current_field = field_map[today]
+    field_num = int(current_field[-1])
+    today_url = f"https://api.thingspeak.com/channels/{CHANNEL_ID}/fields/{field_num}.json?api_key={READ_API_KEY}&results=10"
+
+    response = requests.get(today_url)
+    if response.status_code == 200:
+        data = response.json()
+        feeds = data["feeds"]
+    
+        # Convert pill taken data to 0 or 1 (0 = No pill, 1 = Pill taken)
+        values = [1 if int(feed.get(current_field) or 0) > 0 else 0 for feed in feeds]
+        timestamps_raw = [feed["created_at"] for feed in feeds]
+
+        # Format timestamps: 'Wed, 17 Apr 04:00 PM'
+        timestamps = [
+            datetime.datetime.strptime(ts, "%Y-%m-%dT%H:%M:%SZ").strftime("%a, %d %b %I:%M %p")
+            for ts in timestamps_raw
+        ]
+
+        # Create DataFrame
+        df = pd.DataFrame({"Time": timestamps, "Pill Taken": values}).set_index("Time")
+
+        # Plot the line chart with restricted values (0 or 1)
+        st.subheader(f"📅 Pill Status for: {today}")
+        st.line_chart(df)
+
+    else:
+        st.error("🚫 Failed to fetch today's pill data.")
+
+    st.markdown("<hr style='border: 1px solid #ddd;'>", unsafe_allow_html=True)
+
+    # --- DATE PICKER / DROPDOWN FOR PAST DATES ---
+    st.subheader("📅 View Data for a Specific Date")
+    start_date = datetime.date(2022, 1, 1)  # Start date
+    end_date = datetime.date.today()  # Today's date
+
+    # Create a list of available dates (you can adjust the range here)
+    available_dates = [end_date - datetime.timedelta(days=x) for x in range((end_date - start_date).days + 1)]
+
+    # Add the dropdown for date selection
+    selected_date = st.selectbox("Select Date", available_dates[::-1])  # Reversed to show latest date at the top
+    st.write(f"📅 Data for: {selected_date.strftime('%d %b, %Y')}")
+
+    selected_day = selected_date.strftime("%A")
+    current_field = field_map[selected_day]
+    field_num = int(current_field[-1])
+    selected_url = f"https://api.thingspeak.com/channels/{CHANNEL_ID}/fields/{field_num}.json?api_key={READ_API_KEY}&start={selected_date}T00:00:00Z&end={selected_date}T23:59:59Z"
+
+    response = requests.get(selected_url)
+    if response.status_code == 200:
+        data = response.json()
+        feeds = data["feeds"]
+        values = [int(feed.get(current_field) or 0) for feed in feeds]
+        timestamps_raw = [feed["created_at"] for feed in feeds]
+
+        # Format timestamps
+        timestamps = [
+            datetime.datetime.strptime(ts, "%Y-%m-%dT%H:%M:%SZ").strftime("%a, %d %b %I:%M %p")
+            for ts in timestamps_raw
+        ]
+
+        df = pd.DataFrame({"Time": timestamps, "Pill Taken": values}).set_index("Time")
+        st.line_chart(df)
+    else:
+        st.error("🚫 Failed to fetch the selected day's pill data.")
+    
+    st.markdown("<hr style='border: 1px solid #ddd;'>", unsafe_allow_html=True)
+
+    # --- SOS ALERT INDICATOR ---
+    sos_url = f"https://api.thingspeak.com/channels/{CHANNEL_ID}/fields/8.json?api_key={READ_API_KEY}&results=1"
+    sos_response = requests.get(sos_url)
+    if sos_response.status_code == 200:
+        sos_data = sos_response.json()
+        sos_feeds = sos_data["feeds"]
+        if sos_feeds:
+            latest_sos = int(sos_feeds[0].get("field8") or 0)
+            sos_time = sos_feeds[0].get("created_at", "")
+            sos_time_fmt = datetime.datetime.strptime(sos_time, "%Y-%m-%dT%H:%M:%SZ").strftime("%a, %d %b %I:%M %p")
+            if latest_sos == 1:
+                st.error(f"🚨 SOS Triggered at {sos_time_fmt}")
+            else:
+                st.success("✅ No SOS alerts triggered recently.")
+        else:
+            st.info("No SOS data found.")
+    else:
+        st.warning("⚠️ Unable to fetch SOS data.")
+
+    # --- WEEKLY PILL INTAKE SUMMARY ---
+    st.subheader("📊 Weekly Pill Intake Summary")
+    weekly_data = {}
+    for day, field in field_map.items():
+        url = f"https://api.thingspeak.com/channels/{CHANNEL_ID}/fields/{field[-1]}.json?api_key={READ_API_KEY}&results=100"
+        res = requests.get(url)
+        if res.status_code == 200:
+            day_data = res.json().get("feeds", [])
+            count = sum(int(feed.get(field) or 0) for feed in day_data)
+            weekly_data[day] = count
+        else:
+            weekly_data[day] = 0
+
+    weekly_df = pd.DataFrame({
+        "Day": list(weekly_data.keys()),
+        "Pills Taken": list(weekly_data.values())
+    })
+    st.bar_chart(data=weekly_df.set_index("Day"))
+`,
+
+},
+  },
+  document.getElementById("root")
+)
+
+    </script>
+  </body>
+  <!-- Generated from Stlite Sharing (https://edit.share.stlite.net/), and the source version is 3344dcac1a21800c140a1a82156e24c8ab4f79b9 -->
+</html>
